@@ -17,7 +17,7 @@ def isolate_activities():
     yield
     app_module.activities.clear()
     app_module.activities.update(original_activities)
-
+#test_app.py
 
 def test_root_redirects_to_static_index(client):
     # Arrange
@@ -30,7 +30,7 @@ def test_root_redirects_to_static_index(client):
     assert response.status_code == 307
     assert response.headers["location"] == expected_location
 
-
+#this test checks that the root endpoint redirects to the static index.html page. It verifies that the response status code is 307 (Temporary Redirect) and that the "location" header points to "/static/index.html".
 def test_get_activities_returns_activity_catalog(client):
     # Arrange
     expected_activity = "Chess Club"
