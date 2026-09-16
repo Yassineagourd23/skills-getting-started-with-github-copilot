@@ -8,54 +8,54 @@ from src import app as app_module
 
 @pytest.fixture
 def client():
+    # Create a test client that sends requests to the FastAPI application.
     return TestClient(app_module.app)
 
 
 @pytest.fixture(autouse=True)
 def isolate_activities():
+    # Save the shared activity data so each test starts with clean state.
     original_activities = deepcopy(app_module.activities)
     yield
+    # Restore any changes made by the test after it finishes.
     app_module.activities.clear()
     app_module.activities.update(original_activities)
-#test_app.py
 
 def test_root_redirects_to_static_index(client):
-    # Arrange
+    # Verify that the root URL redirects to the application's static page.
     expected_location = "/static/index.html"
 
-    # Act
+    # Disable redirect following so the redirect response can be inspected.
     response = client.get("/", follow_redirects=False)
 
-    # Assert
+    # Confirm the temporary redirect and its destination.
     assert response.status_code == 307
     assert response.headers["location"] == expected_location
 
-#this test checks that the root endpoint redirects to the static index.html page. It verifies that the response status code is 307 (Temporary Redirect) and that the "location" header points to "/static/index.html".
 def test_get_activities_returns_activity_catalog(client):
-    # Arrange
+    # Request the complete activity catalog.
     expected_activity = "Chess Club"
 
-    # Act
     response = client.get("/activities")
 
-    # Assert
+    # Check that the catalog contains the expected activity and capacity.
     assert response.status_code == 200
     assert expected_activity in response.json()
     assert response.json()[expected_activity]["max_participants"] == 12
 
 
 def test_signup_adds_student_to_activity(client):
-    # Arrange
+    # Prepare a valid activity and student email.
     activity_name = "Basketball Club"
     email = "student@mergington.edu"
 
-    # Act
+    # Sign the student up through the API.
     response = client.post(
         f"/activities/{activity_name}/signup",
         params={"email": email},
     )
 
-    # Assert
+    # Verify the response and confirm the participant was stored.
     assert response.status_code == 200
     assert response.json() == {
         "message": f"Signed up {email} for {activity_name}"
@@ -64,39 +64,37 @@ def test_signup_adds_student_to_activity(client):
 
 
 def test_signup_rejects_unknown_activity(client):
-    # Arrange
+    # Use an activity name that is not in the catalog.
     activity_name = "Unknown Club"
     email = "student@mergington.edu"
 
-    # Act
     response = client.post(
         f"/activities/{activity_name}/signup",
         params={"email": email},
     )
 
-    # Assert
+    # The API should report that the activity does not exist.
     assert response.status_code == 404
     assert response.json() == {"detail": "Activity not found"}
 
 
 def test_signup_rejects_duplicate_participant(client):
-    # Arrange
+    # Michael is already registered for Chess Club.
     activity_name = "Chess Club"
     email = "michael@mergington.edu"
 
-    # Act
     response = client.post(
         f"/activities/{activity_name}/signup",
         params={"email": email},
     )
 
-    # Assert
+    # Duplicate registrations should be rejected as a bad request.
     assert response.status_code == 400
     assert response.json() == {"detail": "Student is already signed up"}
 
 
 def test_signup_rejects_full_activity(client):
-    # Arrange
+    # Fill every available participant slot before signing up another student.
     activity_name = "Basketball Club"
     activity = app_module.activities[activity_name]
     activity["participants"] = [
@@ -104,28 +102,26 @@ def test_signup_rejects_full_activity(client):
         for number in range(activity["max_participants"])
     ]
 
-    # Act
     response = client.post(
         f"/activities/{activity_name}/signup",
         params={"email": "student@mergington.edu"},
     )
 
-    # Assert
+    # The API should reject signups when capacity has been reached.
     assert response.status_code == 400
     assert response.json() == {"detail": "Activity is full"}
 
 
 def test_remove_participant_removes_student_from_activity(client):
-    # Arrange
+    # Select a currently registered student to remove.
     activity_name = "Chess Club"
     email = "michael@mergington.edu"
 
-    # Act
     response = client.delete(
         f"/activities/{activity_name}/participants/{email}"
     )
 
-    # Assert
+    # Verify the response and ensure the student is no longer registered.
     assert response.status_code == 200
     assert response.json() == {
         "message": f"Removed {email} from {activity_name}"
@@ -134,30 +130,28 @@ def test_remove_participant_removes_student_from_activity(client):
 
 
 def test_remove_participant_rejects_unknown_activity(client):
-    # Arrange
+    # Attempt to remove a student from a nonexistent activity.
     activity_name = "Unknown Club"
     email = "student@mergington.edu"
 
-    # Act
     response = client.delete(
         f"/activities/{activity_name}/participants/{email}"
     )
 
-    # Assert
+    # The API should return a not-found error for the activity.
     assert response.status_code == 404
     assert response.json() == {"detail": "Activity not found"}
 
 
 def test_remove_participant_rejects_unregistered_student(client):
-    # Arrange
+    # Attempt to remove a student who is not registered.
     activity_name = "Chess Club"
     email = "student@mergington.edu"
 
-    # Act
     response = client.delete(
         f"/activities/{activity_name}/participants/{email}"
     )
 
-    # Assert
+    # The API should return a not-found error for the student.
     assert response.status_code == 404
     assert response.json() == {"detail": "Student is not signed up"}
